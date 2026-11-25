@@ -1,0 +1,642 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "host-dag-dag-sm/ticket.schema.json",
+  "title": "Host DAG authoritative ticket record (tickets.record_json)",
+  "description": "Design \u00a73.1. The display label and legacy run.json fields are projections of this record.",
+  "x-schema-version": 1,
+  "type": "object",
+  "required": [
+    "ticket",
+    "batch",
+    "title",
+    "phase",
+    "revision",
+    "scheduling",
+    "deps",
+    "waits",
+    "executions",
+    "attempt",
+    "reviews",
+    "pending",
+    "questions",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "ticket": {
+      "type": "string"
+    },
+    "batch": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contract": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "WORK",
+        "REVIEW",
+        "CLOSED"
+      ]
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "scheduling": {
+      "enum": [
+        "deferred",
+        "authorized"
+      ]
+    },
+    "defer": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "deps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "waits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/wait"
+      }
+    },
+    "executions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/execution"
+      }
+    },
+    "candidate": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/candidate"
+        }
+      ]
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/review"
+      }
+    },
+    "pending": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pending"
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/question"
+      }
+    },
+    "closure": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/closure"
+        }
+      ]
+    },
+    "imported": {
+      "type": "object",
+      "description": "B7 legacy claims with limit; not first-hand review/candidate evidence"
+    },
+    "kind": {
+      "enum": [
+        null,
+        "tool",
+        "doc",
+        "product",
+        "ops"
+      ]
+    },
+    "kind_proof": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "release_group": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "requires_for_release": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "release_obligation": {
+      "type": ["object", "null"],
+      "description": "Automatically generated acceptance fact; not a coverage verdict"
+    },
+    "defect_class": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "regression": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "production_write_fence": {
+      "type": "boolean"
+    },
+    "coverage_migration": {
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "$defs": {
+    "wait": {
+      "type": "object",
+      "required": [
+        "wait_id",
+        "kind",
+        "ref",
+        "revision",
+        "source",
+        "added_at",
+        "on_satisfied"
+      ],
+      "properties": {
+        "wait_id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "ticket",
+            "batch",
+            "question",
+            "page-window",
+            "capacity",
+            "lock",
+            "quota",
+            "library-issue",
+            "time",
+            "external"
+          ]
+        },
+        "ref": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "source": {
+          "type": "string"
+        },
+        "added_at": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "on_satisfied": {
+          "$ref": "op.schema.json#/$defs/continuation"
+        },
+        "detail": {
+          "type": "object"
+        },
+        "satisfied_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "satisfied_by": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "waived": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "continued": {
+          "type": "boolean"
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "execution_id",
+        "attempt",
+        "role",
+        "mode",
+        "requested_at",
+        "observed",
+        "observed_at"
+      ],
+      "properties": {
+        "execution_id": {
+          "type": "string"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "role": {
+          "enum": [
+            "executor",
+            "reviewer"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "new_attempt",
+            "resume",
+            "adopt",
+            "review"
+          ]
+        },
+        "axis": {
+          "enum": [
+            "spec",
+            "standards",
+            null
+          ]
+        },
+        "observed": {
+          "enum": [
+            "starting",
+            "running",
+            "unknown",
+            "finished",
+            "orphaned"
+          ]
+        },
+        "candidate_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "effort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "contract": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "resume_of": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "override_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requested_at": {
+          "type": "string"
+        },
+        "observed_at": {
+          "type": "string"
+        },
+        "result": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "segment": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "required": [
+        "digest",
+        "from_execution"
+      ],
+      "properties": {
+        "digest": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "string"
+        },
+        "from_execution": {
+          "type": "string"
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": [
+        "review_request_id",
+        "axis",
+        "candidate_digest",
+        "execution_id"
+      ],
+      "properties": {
+        "review_request_id": {
+          "type": "string"
+        },
+        "axis": {
+          "enum": [
+            "spec",
+            "standards"
+          ]
+        },
+        "candidate_digest": {
+          "type": "string"
+        },
+        "execution_id": {
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            null
+          ]
+        },
+        "max_severity": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3",
+            null
+          ]
+        }
+      }
+    },
+    "pending": {
+      "type": "object",
+      "required": [
+        "action_id",
+        "kind",
+        "mode",
+        "allowed_actions",
+        "status",
+        "created_at"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "resume",
+            "request_reviews",
+            "run_window",
+            "register_watch",
+            "push",
+            "cleanup",
+            "dispatch",
+            "triage_result",
+            "triage_reviews",
+            "apply_decision",
+            "unresolvable_wait",
+            "executor_unknown",
+            "recovery",
+            "prepare_window",
+            "clear_hold",
+            "answer_user",
+            "window_result",
+            "window_lost",
+            "window_check_failed",
+            "window_launch_failed",
+            "next_step"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "outbox",
+            "decide"
+          ]
+        },
+        "allowed_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "delivered",
+            "claimed",
+            "done",
+            "superseded",
+            "escalated"
+          ]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "bound": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "payload": {
+          "type": "object"
+        },
+        "nudges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "detail": {
+          "type": "string"
+        },
+        "done_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "required": [
+        "question_id",
+        "revision",
+        "to",
+        "key",
+        "title",
+        "asked_at"
+      ],
+      "properties": {
+        "question_id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        },
+        "to": {
+          "enum": [
+            "advisor",
+            "user"
+          ]
+        },
+        "key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "asked_at": {
+          "type": "string"
+        },
+        "question_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "answer": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    },
+    "closure": {
+      "type": "object",
+      "required": [
+        "kind",
+        "at"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "accepted",
+            "failed",
+            "canceled",
+            "superseded"
+          ]
+        },
+        "at": {
+          "type": "string"
+        },
+        "scope": {
+          "enum": [
+            "FULL",
+            "SCOPED",
+            "REDUCED",
+            null
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "superseded_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidate_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "affects_downstream": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "waive_reviews": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "integrated": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

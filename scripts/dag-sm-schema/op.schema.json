@@ -1,0 +1,739 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "host-dag-dag-sm/op.schema.json",
+  "title": "Host DAG state-machine op (command or fact)",
+  "description": "Cross-language contract of scripts/hostdag_dag_core.py (design \u00a79.3). The core validates at runtime with the same rules; this file is the published shape.",
+  "x-schema-version": 1,
+  "x-commands": [
+    "ticket.classify",
+    "ticket.create",
+    "ticket.amend",
+    "ticket.authorize",
+    "execution.request",
+    "question.ask",
+    "decision.respond",
+    "wait.add",
+    "wait.update",
+    "wait.waive",
+    "pagewindow.enqueue",
+    "ticket.close",
+    "ticket.integrate",
+    "authority.switch",
+    "resource.unpause",
+    "pagewindow.policy",
+    "migration.seed"
+  ],
+  "x-facts": [
+    "execution.observed",
+    "review.observed",
+    "question.answered",
+    "wait.satisfied",
+    "resource.observed",
+    "clock.observed",
+    "pending.progress"
+  ],
+  "type": "object",
+  "required": [
+    "op_id",
+    "kind",
+    "actor",
+    "at",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "op_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "enum": [
+        "ticket.classify",
+        "ticket.create",
+        "ticket.amend",
+        "ticket.authorize",
+        "execution.request",
+        "question.ask",
+        "decision.respond",
+        "wait.add",
+        "wait.update",
+        "wait.waive",
+        "pagewindow.enqueue",
+        "ticket.close",
+        "ticket.integrate",
+        "authority.switch",
+        "resource.unpause",
+        "pagewindow.policy",
+        "migration.seed",
+        "execution.observed",
+        "review.observed",
+        "question.answered",
+        "wait.satisfied",
+        "resource.observed",
+        "clock.observed",
+        "pending.progress"
+      ]
+    },
+    "actor": {
+      "enum": [
+        "advisor",
+        "controller",
+        "coordinator",
+        "pagewindow",
+        "probe",
+        "seed",
+        "user",
+        "watcher"
+      ]
+    },
+    "at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "submitter clock with UTC offset; part of the fact, excluded from the request digest"
+    },
+    "ticket": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expected_revision": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "epoch": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "integration_proof": {
+      "type": "object",
+      "description": "Tool-generated integration audit fact, outside request identity. Live writes ignore and regenerate it; only trusted offline audit reconstruction reads it."
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "enum": [
+            "executor",
+            "reviewer"
+          ]
+        },
+        "axis": {
+          "enum": [
+            "spec",
+            "standards"
+          ]
+        },
+        "max_severity": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2",
+            "P3"
+          ]
+        },
+        "scheduling": {
+          "enum": [
+            "deferred",
+            "authorized"
+          ]
+        },
+        "deps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "executor_unknown_after": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "clock.observed (B3 controller): seconds the current executor may stay observed=unknown before an executor_unknown decision"
+        },
+        "observed": {
+          "enum": [
+            "starting",
+            "running",
+            "unknown",
+            "finished",
+            "orphaned"
+          ]
+        },
+        "to": {
+          "enum": [
+            "advisor",
+            "user"
+          ]
+        },
+        "on_satisfied": {
+          "$ref": "#/$defs/continuation"
+        },
+        "on_released": {
+          "$ref": "#/$defs/continuation"
+        },
+        "asked_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "question.ask (B4 `question link`): when the advisor question was really asked; not after the op time"
+        },
+        "spec_digest": {
+          "type": "string",
+          "description": "pagewindow.enqueue (B4): sha256 of the approved spec file"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "legacy_reconcile": {
+          "type": "object",
+          "required": [
+            "run_json_sha256"
+          ],
+          "properties": {
+            "state": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "run_json_sha256": {
+              "type": "string"
+            },
+            "accept_scope": {
+              "enum": [
+                "FULL",
+                "SCOPED",
+                "REDUCED"
+              ]
+            },
+            "affects_downstream": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "accepted_tip": {
+              "type": "string"
+            }
+          },
+          "description": "ticket.close by actor seed only (`host-dag sm reconcile`, core-mirror): backfill an accepted closure run.json records and the core lost; needs kind=accepted and reason"
+        },
+        "ticket_source": {
+          "type": "object"
+        }
+      }
+    },
+    "kind_proof": {
+      "type": "object",
+      "description": "Tool-generated classification path proof; live writes revalidate, trusted offline audit restores it."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ticket.create"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "batch",
+              "title",
+              "scheduling"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ticket.amend"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ticket.authorize"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "execution.request"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "role"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "question.ask"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "to",
+              "key",
+              "title"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "decision.respond"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "action_id",
+              "response"
+            ]
+          }
+        },
+        "required": [
+          "ticket",
+          "expected_revision"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "wait.add"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "kind",
+              "ref"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "wait.update"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "wait_id",
+              "ref",
+              "reason"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "wait.waive"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "wait_id",
+              "reason"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "pagewindow.enqueue"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ticket.close"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "kind"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ticket.integrate"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "candidate_digest"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "authority.switch"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "epoch",
+              "mode"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "resource.unpause"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "resource",
+              "reason"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "execution.observed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "execution_id",
+              "observed"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "review.observed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "review_request_id",
+              "candidate_digest",
+              "axis",
+              "verdict"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "question.answered"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "question_id",
+              "source_record",
+              "verdict"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "wait.satisfied"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "wait_id",
+              "source_record",
+              "observed_at"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "resource.observed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "resource",
+              "event"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "pending.progress"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "action_id",
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "pagewindow.policy"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "priority",
+              "reason"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "migration.seed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "actor": {
+            "const": "seed"
+          },
+          "payload": {
+            "required": [
+              "tickets",
+              "seed"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "ticket.classify"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "required": [
+              "kind",
+              "ticket_source"
+            ]
+          }
+        },
+        "required": [
+          "ticket"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "continuation": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "none",
+            "resume",
+            "request_reviews",
+            "run_window",
+            "apply_decision",
+            "decide"
+          ]
+        },
+        "bound": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

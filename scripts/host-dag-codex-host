@@ -1,0 +1,6 @@
+#!/bin/sh
+# Stable executable entry for host-dag-host-watch --host-cli.
+set -eu
+script_dir=$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd)
+host_python=${HOST_DAG_CODEX_PYTHON:-${XDG_DATA_HOME:-$HOME/.local/share}/host-dag-codex-host/venv/bin/python}
+exec "$host_python" "$script_dir/host-dag-codex-host.py" "$@"

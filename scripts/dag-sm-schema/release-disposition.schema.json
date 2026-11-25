@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "host-dag-dag-sm/release-disposition.schema.json",
+  "title": "Board release disposition metadata (not core Ticket state)",
+  "type": "object",
+  "required": [
+    "kind",
+    "excluded_from",
+    "required_by",
+    "expires_at",
+    "decision_ref",
+    "approved_by"
+  ],
+  "properties": {
+    "kind": {
+      "enum": [
+        "deferred",
+        "superseded",
+        "not_applicable"
+      ]
+    },
+    "excluded_from": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_by": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "decision_ref": {
+      "type": "string"
+    },
+    "approved_by": {
+      "type": "string"
+    },
+    "external_candidate": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]*:[0-9a-f]{40}$",
+      "description": "External roadmap obligation only; never substitutes for consumed-source proof."
+    }
+  }
+}
