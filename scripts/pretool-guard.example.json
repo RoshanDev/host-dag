@@ -1,0 +1,27 @@
+{
+  "log": "~/.local/state/host-dag/pretool-guard-denials.jsonl",
+  "git": [
+    {
+      "subcommand": "stash",
+      "allow": ["list", "show"],
+      "message": "git stash is blocked: keep the current checkout and continue in the ticket's own worktree; do not switch to reset --hard or checkout -- . (git stash list / show are fine)."
+    },
+    {
+      "subcommand": "push",
+      "deny_if_args_any": ["--force", "-f", "--force-with-lease", "--mirror"],
+      "message": "Forced or mirror push is blocked; integrate in a separate worktree and push normally."
+    }
+  ],
+  "search": [
+    {
+      "paths": [
+        "/mnt/evidence",
+        "/mnt/evidence/runs",
+        "/mnt/evidence/runs/*",
+        "/mnt/evidence/runs/*/evidence"
+      ],
+      "deny_ancestors": true,
+      "message": "Recursive search of {target} is blocked (large evidence disk). Search control/, a single file, or one ticket's evidence subdirectory; do not switch to rg/find to continue."
+    }
+  ]
+}

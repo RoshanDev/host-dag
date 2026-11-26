@@ -217,3 +217,17 @@ cat "$DEMO/fake-host/wakeups.jsonl"
   ```
 
   `options` 的值是参数个数（0 或 1），没声明的参数一律拒绝。`run_flag` 必须指向当前 run 目录。`heads_repos` 列出 inputs 里要和 `control/release-heads.json` 对上的仓库键，`materials` 列出要算 sha256 进证明的文件键。没有这个文件时，方案 b 直接拒绝，a/c/NONE 照常可用。
+
+## 执行前守卫（可选）
+
+记忆或文档里的「不要做 X」反复被违反时，可以改成执行前拦截。`scripts/hostdag_pretool_guard.py` 是 Claude Code / Codex 通用的 PreToolUse hook：放行时 exit 0、不输出；拒绝时 exit 2，原因写到 stderr；脚本自身出错也按拒绝处理（故障即阻断）。它不改写命令，可以和 rtk 这类改写 hook 并存。
+
+- **规则文件**：按 `--config PATH` > `$HOST_DAG_GUARD_CONFIG` > `~/.config/host-dag/pretool-guard.json` 的顺序找。没有规则文件时全部放行；规则文件读不了或格式错算守卫故障。样例见 `scripts/pretool-guard.example.json`：
+  - `git`：`{"subcommand": "stash", "allow": ["list", "show"]}` 只放行这两个子命令；`{"subcommand": "push", "deny_if_args_any": ["--force", "-f"]}` 只在带这些参数时拦；只写 `subcommand` 时整条拦。能识别 `git -C`、绝对路径的 git、`cd … &&`、`timeout`/`env`/`rtk` 前缀和一层 `bash -c`；`echo`、提交信息、heredoc 正文里出现的不拦。
+  - `search`：`paths` 是绝对路径，每段可用 `*`。递归内容搜索（`grep -r/-R/--recursive`、`rg`、Claude 的 Grep 工具）的目标正好是其中某一项就拦；`deny_ancestors`（默认 true）把这些目录的上级目录也算进去。更深的子目录和单个文件不拦。
+  - `message` 写替代做法，`{target}` 会换成被拦的路径。拒绝记录写到 `log`（JSONL，设为空串则不记）。
+- **安装**：把脚本复制到不会随切分支消失的位置（如 `~/.local/libexec/`），配置里写绝对路径。故障即阻断的 hook 一旦脚本文件不见了，所有命令都会被拦。
+  - Claude：`~/.claude/settings.json` → `hooks.PreToolUse` 加 `{"matcher": "Bash|Grep", "hooks": [{"type": "command", "command": "/usr/bin/python3 /abs/hostdag_pretool_guard.py --config /abs/pretool-guard.json", "timeout": 10}]}`。
+  - Codex：`~/.codex/hooks.json` → `hooks.PreToolUse` 加同样的条目（matcher 用 `Bash`）。**追加到已有条目之后**：Codex 按「文件:事件:条目序号:hook 序号」记信任，插到前面会让后面的 hook 全部失去信任。随后在 Codex 里登记信任（TUI 里确认，或用 app-server `hooks/list` 读出 `currentHash` 写进 `config.toml` 的 `hooks.state."<key>".trusted_hash`）。
+- **自检**：`scripts/hostdag_guard_selfcheck.py` 检查三件事：Claude 配置里有这个 hook；Codex `hooks/list` 显示它已启用且已信任；拿它要拦的命令（默认 `git stash`）实际跑一遍确实被拒，拿 `true` 跑一遍确实放行。**Codex 不会运行未信任的 hook，而且跳过时不报错**：改条目顺序、改命令行或 Codex 自动升级都可能让守卫失效。所以每次改 hook 配置或升级之后都要跑一次自检，最好再挂一个定时器定期跑（失败时 exit 1）。
+- **覆盖不到的地方**：脚本内部的命令、`xargs`、`find -exec`、用变量拼出的路径、嵌套 3 层以上的 shell，以及不走这两个客户端 hook 的执行者（如 ACP）。

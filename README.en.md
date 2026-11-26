@@ -58,6 +58,10 @@ See [docs/adopt-in-other-project.md](docs/adopt-in-other-project.md) for a self-
 | `HOST_DAG_TELEGRAM_CONFIG` | `~/.config/host-dag/telegram.env` | Telegram bot config path (set `/dev/null` to disable) |
 | `HOST_DAG_PAGE_WINDOW_PYTHON` | `sys.executable` | Python interpreter used for optional browser/page-window helpers |
 
+## Pre-tool guard (optional)
+
+`scripts/hostdag_pretool_guard.py` is a PreToolUse hook for both Claude Code and Codex. Its rules live in a JSON file (block git subcommands, block recursive search of chosen directories), and it fails closed. `scripts/hostdag_guard_selfcheck.py` verifies the hook is still live in both clients, including Codex hook trust. See [docs/adopt-in-other-project.md](docs/adopt-in-other-project.md) (section 执行前守卫).
+
 ## Running Tests
 
 Requires Python 3.11+ (tested on 3.14). `test_hostdag_codex_host.py` requires the `websockets` package; `test_hostdag_host_watch.py` requires an explicit `TMPDIR` outside `/tmp` and `$HOME` root.

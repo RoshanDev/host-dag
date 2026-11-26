@@ -58,6 +58,10 @@
 | `HOST_DAG_TELEGRAM_CONFIG` | `~/.config/host-dag/telegram.env` | Telegram Bot 配置文件路径（设为 `/dev/null` 可关闭） |
 | `HOST_DAG_PAGE_WINDOW_PYTHON` | `sys.executable` | 可选浏览器 / 页面窗口辅助脚本使用的 Python 解释器 |
 
+## 执行前守卫（可选）
+
+`scripts/hostdag_pretool_guard.py` 是 Claude Code / Codex 通用的 PreToolUse 守卫，规则写在 JSON 文件里（拦 git 子命令、拦对指定目录的递归搜索），故障即阻断；`scripts/hostdag_guard_selfcheck.py` 检查它在两个客户端里仍然生效（含 Codex 的 hook 信任）。用法见 [docs/adopt-in-other-project.md](docs/adopt-in-other-project.md#执行前守卫可选)。
+
 ## 运行测试
 
 需要 Python 3.11+（已在 3.14 上实测）。其中 `test_hostdag_codex_host.py` 需要安装 `websockets` 包；`test_hostdag_host_watch.py` 要求显式指定不在 `/tmp` 与 `$HOME` 根目录下的 `TMPDIR`。
