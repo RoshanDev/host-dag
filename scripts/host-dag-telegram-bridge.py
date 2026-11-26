@@ -28,6 +28,8 @@ from hostdag_self_heal import flush_deferred, telegram_config  # noqa: E402
 
 POLL_SECONDS = 50
 RETRY_SECONDS = 30
+STALE_SECONDS = 3600      # a reply older than this is forwarded with an explicit "old reply" warning
+STUCK_SECONDS = 30 * 60   # undelivered this long -> tell the user on Telegram once
 MAX_TEXT = 3800
 HEADER = (
     "[Telegram 用户回复] 以下文字来自用户本人的 Telegram（chat {chat}），由 host-dag-telegram-bridge 原样转发，"
@@ -114,15 +116,32 @@ def take_updates(state: dict[str, Any], updates: list[dict[str, Any]], chat: str
         quoted = (message.get("reply_to_message") or {}).get("text") or ""
         state.setdefault("queue", []).append({
             "message_id": message["message_id"], "text": text, "quoted": quoted,
-            "received": time.time(), "status": "queued",
+            "received": time.time(), "sent_at": message.get("date"), "status": "queued",
         })
 
 
-def deliver(state: dict[str, Any], chat: str, api: Api, host: Host, thread: str, scratch: Path) -> None:
+def stale_note(item: dict[str, Any], now: float) -> str:
+    """A reply delivered late (one arrived six days late) must not be acted on as a new decision."""
+    sent_at = item.get("sent_at") or item.get("received")
+    if not sent_at or now - float(sent_at) < STALE_SECONDS:
+        return ""
+    age = now - float(sent_at)
+    ago = f"{age / 86400:.1f} 天" if age >= 86400 else f"{age / 3600:.1f} 小时"
+    when = time.strftime("%m-%d %H:%M", time.localtime(float(sent_at)))
+    return (f"⚠ 旧回复：用户在 {when}（台北时间，约 {ago}前）发出这条，因转发延迟现在才送到。"
+            "它可能已被之后的指示取代；执行前先在回复里向用户确认一句，不要直接当作新决定。")
+
+
+def deliver(state: dict[str, Any], chat: str, api: Api, host: Host, thread: str, scratch: Path,
+            now: float | None = None) -> None:
     """Send queued replies when the coordinator accepts them; push its answer back when done."""
+    now = time.time() if now is None else now
     for item in state.get("queue", []):
         if item["status"] == "queued":
             parts = [HEADER.format(chat=chat)]
+            note = stale_note(item, now)
+            if note:
+                parts.append(note)
             if item["quoted"]:
                 parts.append("用户回复的通知：\n" + item["quoted"])
             parts.append("用户原话：\n" + item["text"])
@@ -131,7 +150,11 @@ def deliver(state: dict[str, Any], chat: str, api: Api, host: Host, thread: str,
             body = host(["thread", "send", "--message-file", str(message_file), thread])
             if body.get("error"):
                 item["last_error"] = body["error"]
-                continue  # busy or unreachable: retry next round, in order
+                if not item.get("stuck_notified") and now - float(item.get("received", now)) >= STUCK_SECONDS:
+                    say(api, chat, f"这条还没送到协调者（{body['error']}），转发器会继续重试；"
+                        "急的话直接在终端里说。", item["message_id"])
+                    item["stuck_notified"] = True
+                break  # busy or unreachable: retry next round, oldest first
             item["turn"] = (body.get("turn") or {}).get("id")
             item["status"] = "sent"
             say(api, chat, "已转给协调者，等它回复。", item["message_id"])
@@ -164,9 +187,15 @@ def main(argv: list[str] | None = None) -> int:
         print("telegram config missing token or chat id", file=sys.stderr)
         return 2
     api = make_api(config)
-    host = make_host(watch["host_cli"], watch["host_cwd"])
-    thread = watch["parent_thread"]
     while True:
+        # Re-read every round: the coordinator thread rotates; a thread fixed at start-up kept
+        # a reply stayed queued against a dead thread for days.
+        try:
+            watch = json.loads(Path(args.state).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            print(f"watch.json unreadable, keeping previous thread: {exc}", file=sys.stderr)
+        host = make_host(watch["host_cli"], watch["host_cwd"])
+        thread = watch["parent_thread"]
         state = load(bridge_state)
         waiting = any(i["status"] != "answered" for i in state.get("queue", []))
         try:

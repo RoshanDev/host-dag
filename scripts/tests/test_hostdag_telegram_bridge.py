@@ -16,6 +16,7 @@ spec.loader.exec_module(bridge)  # type: ignore[union-attr]
 
 CHAT = "100000001"
 THREAD = "parent-thread"
+STUCK = 31 * 60
 
 
 def update(uid: int, chat: str, text: str, quoted: str = "") -> dict:
@@ -78,6 +79,42 @@ class BridgeTest(unittest.TestCase):
         bridge.deliver(state, CHAT, self.api, self.host, THREAD, self.scratch)
         self.assertEqual(state["queue"], [])
         self.assertTrue(self.sent[-1]["text"].endswith("已续做 round3"))
+
+    def test_old_reply_is_forwarded_with_stale_warning(self) -> None:
+        state: dict[str, Any] = {"offset": 0}
+        up = update(3, CHAT, "agy按照推荐的来吧，选B", "需要你选：agy")
+        up["message"]["date"] = 1_000_000
+        bridge.take_updates(state, [up], CHAT, self.api, self.host, THREAD)
+        bridge.deliver(state, CHAT, self.api, self.host, THREAD, self.scratch, now=1_000_000 + 6 * 86400)
+        self.assertIn("旧回复", self.forwarded)
+        self.assertIn("6.0 天", self.forwarded)
+        self.assertIn("先在回复里向用户确认", self.forwarded)
+
+    def test_fresh_reply_has_no_stale_warning(self) -> None:
+        state: dict[str, Any] = {"offset": 0}
+        up = update(4, CHAT, "能清")
+        up["message"]["date"] = 2_000_000
+        bridge.take_updates(state, [up], CHAT, self.api, self.host, THREAD)
+        bridge.deliver(state, CHAT, self.api, self.host, THREAD, self.scratch, now=2_000_000 + 60)
+        self.assertNotIn("旧回复", self.forwarded)
+
+    def test_stuck_reply_tells_user_once_and_keeps_order(self) -> None:
+        state: dict[str, Any] = {"offset": 0}
+        bridge.take_updates(state, [update(7, CHAT, "第一条"), update(8, CHAT, "第二条")],
+                            CHAT, self.api, self.host, THREAD)
+        for item in state["queue"]:
+            item["received"] = 0
+        self.busy = True
+        for _ in range(3):
+            bridge.deliver(state, CHAT, self.api, self.host, THREAD, self.scratch, now=STUCK)
+        notices = [p for p in self.sent if "还没送到协调者" in p["text"]]
+        self.assertEqual(len(notices), 1)
+        self.assertEqual(notices[0]["reply_parameters"]["message_id"], 70)
+        sends = [c for c in self.host_calls if c[:2] == ["thread", "send"]]
+        self.assertEqual(len(sends), 3, "only the oldest item is tried while it is stuck")
+        self.busy = False
+        bridge.deliver(state, CHAT, self.api, self.host, THREAD, self.scratch, now=STUCK)
+        self.assertIn("第一条", self.forwarded)
 
     def test_status_command_answers_without_forwarding(self) -> None:
         state: dict[str, Any] = {"offset": 0}
